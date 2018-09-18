@@ -3,78 +3,44 @@
 
 module Main where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Char
-import Data.Function ((&))
+import Update
 import Data.Monoid
-import Text.Read
-import UpdateT
 
-main :: IO ()
-main = auditUpdateT loop (BankBalance 0) >>= print
+newtype BankBalance = BankBalance Int 
+  deriving (Eq, Ord, Show)
 
-testGame :: BankBalance
-testGame =
-  applyAction [Deposit 30, Deposit 30, Withdraw 50, Deposit 10] (BankBalance 0)
-
-loop :: UpdateT [AccountAction] BankBalance IO ()
-loop = do
-  ln <- liftIO getLine
-  unless (filter (not . isSpace) ln == "q") $ do
-    let mAmt = readMaybe ln
-    case mAmt of
-      Nothing -> liftIO (print "please enter a number")
-      Just amt -> do
-        let evt =
-              if amt > 0
-                then Deposit amt
-                else Withdraw (abs amt)
-        liftIO (print evt)
-        putAction [evt]
-        getState >>= liftIO . print
-    loop
-
-instance ApplyAction [AccountAction] BankBalance where
-  applyAction actions balance =
-    let allTransactions :: BankBalance -> BankBalance
-        allTransactions =
-          appEndo $ foldMap (Endo . processTransaction) (reverse actions)
-     in allTransactions balance
+data AccountAction = 
+    Deposit Int
+  | Withdraw Int
+  | ApplyInterest deriving (Eq, Ord, Show)
 
 processTransaction :: AccountAction -> BankBalance -> BankBalance
-processTransaction (Deposit n) (BankBalance b) = BankBalance (b + n)
-processTransaction (Withdraw n) (BankBalance b) = BankBalance (b - n)
-processTransaction ApplyInterest (BankBalance b) = BankBalance (applyInterest b)
+processTransaction (Deposit n) (BankBalance b) = BankBalance $ n + b
+processTransaction (Withdraw n) (BankBalance b) 
+  | (n > b) = BankBalance 0
+  | otherwise = BankBalance $ b - n
+processTransaction ApplyInterest (BankBalance b) =
+  BankBalance (truncate $ fromIntegral b * 1.1)
 
--- This is a gross oversimplification...
--- I really hope my bank does something smarter
--- We (kinda sorta) add 10% interest, truncating any cents.
--- Who likes keeping track of change anyways ¯\_(ツ)_/¯
-applyInterest :: Int -> Int
-applyInterest balance = truncate (fromIntegral balance * 1.1)
+-- not clear why do we need to use all that Endo machinery here??
+-- instance ApplyAction [AccountAction] BankBalance where
+--   applyAction actions balance =
+--     let allTransactions :: BankBalance -> BankBalance
+--         allTransactions =
+--           appEndo $ foldMap (Endo . processTransaction) (reverse actions)
+--      in allTransactions balance
 
-newtype BankBalance =
-  BankBalance Int
-  deriving (Eq, Ord, Show)
+instance ApplyAction [AccountAction] BankBalance where
+  applyAction = flip . foldl . flip $ processTransaction
 
-data AccountAction
-  = Deposit Int
-  | Withdraw Int
-  | ApplyInterest
-  deriving (Eq, Ord, Show)
-
-useATM :: Update [AccountAction] BankBalance BankBalance
+useATM :: Update [AccountAction] BankBalance ()
 useATM = do
-  putAction [Deposit 20]
   putAction [Deposit 30]
+  putAction [Deposit 20]
   putAction [ApplyInterest]
   putAction [Withdraw 10]
-  getState
 
-testBankSystem :: Bool
-testBankSystem =
-  applyAction
-    [Deposit 20, Deposit 30, ApplyInterest, Withdraw 10]
-    (BankBalance 0) ==
-  BankBalance 45
+main :: IO ()
+main = do
+  let rp = resultWithLog useATM (BankBalance 0)
+  putStrLn . show $ rp
