@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b8c3bd4f4a605aa5b374c6fa486c238365531f0728429007c5ca1133af99b1a3
+-- hash: cd3dcf1d7ba4e985c7423b2aad3958cf0326b54632b27abed5212c17e3a78ced
 
 name:           update-monad
 version:        0.1.0.0
@@ -26,8 +26,10 @@ source-repository head
 
 library
   exposed-modules:
+      Extensions
       FreeUpdate
       State
+      Types
       Update
       UpdateState
       UpdateT

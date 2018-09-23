@@ -1,19 +1,12 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Update where
 
 import Data.Monoid
-
-class Monoid p => ApplyAction p s where
-  applyAction :: p -> s -> s
-
-class (ApplyAction p s, Monad m) => MonadUpdate m p s | m -> s, m -> p
-  where 
-    putAction :: p -> m ()
-    getState :: m s
+import Types
 
 data Update p s a = Update {
   runUpdate :: s -> (p, a)
@@ -58,7 +51,7 @@ auditUpdate u s =
 -- runUpdate useATM (BankBalance 0)
 -- ([Deposit 20,Deposit 30,ApplyInterest,Withdraw 10],BankBalance 45)
 -- we need a function like this:
-resultWithLog :: (ApplyAction p s ) => Update p s a -> s -> (p, s)
-resultWithLog u s =
+resultWithLogUpdate :: (ApplyAction p s) => Update p s a -> s -> (p, s)
+resultWithLogUpdate u s =
   let (p, (_, s')) = runUpdate ((,) <$> u <*> getState) s
   in (p, s') 

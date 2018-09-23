@@ -5,14 +5,8 @@ module Main where
 
 import Update
 import Data.Monoid
-
-newtype BankBalance = BankBalance Int 
-  deriving (Eq, Ord, Show)
-
-data AccountAction = 
-    Deposit Int
-  | Withdraw Int
-  | ApplyInterest deriving (Eq, Ord, Show)
+import Types
+import Extensions
 
 processTransaction :: AccountAction -> BankBalance -> BankBalance
 processTransaction (Deposit n) (BankBalance b) = BankBalance $ n + b
@@ -40,7 +34,15 @@ useATM = do
   putAction [ApplyInterest]
   putAction [Withdraw 10]
 
+logATM :: UpdateWriter [AccountAction] ()
+logATM = do
+  updateWriter ((), [Deposit 10])
+  putAction [Deposit 30]
+  putAction [Deposit 20]
+  updateTell [ApplyInterest]
+  putAction [Withdraw 10]
+
 main :: IO ()
 main = do
-  let rp = resultWithLog useATM (BankBalance 0)
-  putStrLn . show $ rp
+  putStrLn . show $ resultWithLogUpdate useATM (BankBalance 0)
+  putStrLn . show $ updateListen logATM
