@@ -1,12 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Main where
 
 import Update
 import Data.Monoid
 import Types
-import Extensions
+import Writer
+import Data.Tuple (swap)
 
 processTransaction :: AccountAction -> BankBalance -> BankBalance
 processTransaction (Deposit n) (BankBalance b) = BankBalance $ n + b
@@ -34,15 +36,28 @@ useATM = do
   putAction [ApplyInterest]
   putAction [Withdraw 10]
 
-logATM :: UpdateWriter [AccountAction] ()
+logATM :: Writer [AccountAction] ()
 logATM = do
-  updateWriter ((), [Deposit 10])
-  putAction [Deposit 30]
-  putAction [Deposit 20]
-  updateTell [ApplyInterest]
-  putAction [Withdraw 10]
+  writer ((), [Deposit 10])
+  tell [Deposit 30]
+  tell [Deposit 20]
+  tell [ApplyInterest]
+  tell [Withdraw 10]
 
 main :: IO ()
 main = do
   putStrLn . show $ resultWithLogUpdate useATM (BankBalance 0)
-  putStrLn . show $ updateListen logATM
+
+  -- writer
+  putStrLn 
+    . show 
+    . flip evalUpdate () 
+    . listen 
+    $ logATM -- listen demonstartion
+
+  putStrLn 
+    . show 
+    . swap 
+    . flip resultWithLogUpdate () 
+    . pass 
+    $ ((\v -> (v, reverse)) <$> logATM) -- transforning log with pass
