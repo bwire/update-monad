@@ -66,11 +66,11 @@ useATMWithWriter init =
 readerOp :: AccountAction -> (BankBalance -> Reader AccountAction BankBalance)
 readerOp r = reader . const . processTransaction r 
 
--- not a good idea completely thow, because there we need to somehow 
--- provide information about upcoming Action as an input parameter on every step 
--- in other words - different environment every time fro monadic chain to work as we expect.
--- Because the implementation or real Reader monad uses the same environment on every step - I think this approach might brake
--- monadic laws or something :((
+-- Not a good idea completely thow, because there we need to somehow 
+-- provide information about upcoming Action as an input parameter on every step. 
+-- In other words - I don't use an environment at all, actually I dpn't care about any environment because all the logic
+-- doesn't depend on the environment - which is nonsense for the Reader.. :). But I can't use the environment for this task - 
+-- it must be shared through all monadic operations. It's useless in this case.
 useATMWithReader :: BankBalance -> Reader AccountAction BankBalance
 useATMWithReader init = 
   reader (const init)
