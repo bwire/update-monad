@@ -8,6 +8,7 @@ import Update
 import Data.Monoid
 import Types
 import Writer
+import Reader
 import Data.Tuple (swap)
 
 processTransaction :: AccountAction -> BankBalance -> BankBalance
@@ -61,6 +62,27 @@ useATMWithWriter init =
    >>= writerOp ApplyInterest
    >>= writerOp (Withdraw 10)
 
+-- I have no idea how to use Reader with all these bank stuff, except of balance changing without logging.
+readerOp :: AccountAction -> (BankBalance -> Reader AccountAction BankBalance)
+readerOp r = reader . const . processTransaction r 
+
+-- not a good idea completely thow, because there we need to somehow 
+-- provide information about upcoming Action as an input parameter on every step 
+-- in other words - different environment every time fro monadic chain to work as we expect.
+-- Because the implementation or real Reader monad uses the same environment on every step - I think this approach might brake
+-- monadic laws or something :((
+useATMWithReader :: BankBalance -> Reader AccountAction BankBalance
+useATMWithReader init = 
+  reader (const init)
+    >>= readerOp (Deposit 30)
+    >>= readerOp (Deposit 20)
+    >>= readerOp ApplyInterest
+    >>= readerOp (Withdraw 10)
+
+-- hellper to hide the fact that we need to pass something to extract a closure value from the resulting function 
+getBalanceWithReader :: Reader AccountAction BankBalance -> BankBalance
+getBalanceWithReader = flip evalUpdate undefined
+
 main :: IO ()
 main = do
   putStrLn . show $ resultWithLogUpdate useATM (BankBalance 0)
@@ -85,3 +107,10 @@ main = do
     . flip evalUpdate () 
     . listen 
     $ useATMWithWriter (BankBalance 0)
+
+  -- reader
+  putStrLn 
+    . show 
+    . getBalanceWithReader 
+    . useATMWithReader 
+    $ BankBalance 0
