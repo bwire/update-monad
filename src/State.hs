@@ -1,48 +1,43 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module State where
 
-import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.Writer
+import Types
+import Update
+import UpdateT
+import Data.Monoid
 
-newtype StateReader r a =
-  StateReader (State r a)
-  deriving (Functor, Applicative, Monad)
+type State s a = Update [s] s a
+type StateT s m a = UpdateT [s] s m a
 
-instance MonadReader r (StateReader r)
-  -- ask just returns the state
-                                where
-  ask = StateReader get
-  local mod (StateReader m) =
-    StateReader $
-      -- We want to keep track the initial state so we can set it back after we
-      -- temporarily edit our state.
-     do
-      before <- get
-      modify mod
-      a <- m
-      put before
-      return a
+instance ApplyAction [a] a where
+  applyAction = flip const
 
-newtype StateWriter w a =
-  StateWriter (State w a)
-  deriving (Functor, Applicative, Monad)
+state :: (s -> (s, a)) -> State s a
+state f = Update $ \s -> 
+  let (s', a) = f s
+  in ([s'], a)
 
-instance Monoid w => MonadWriter w (StateWriter w)
-  -- tell just mappends onto our state
-                                       where
-  tell m = StateWriter (modify (`mappend` m))
-  -- listen collects some new state which we return, then we apply it to our
-  -- running tally.
-  listen (StateWriter m) =
-    let (a, s) = runState m mempty
-     in tell s >> return (a, s)
-  -- pass runs some action in our monad which results in a function which
-  -- we allow to modify the new state before we append it to the state we've
-  -- already collected
-  pass (StateWriter m) =
-    let ((a, f), s) = runState m mempty
-     in tell (f s) >> return a
+stateT :: Monad m => (s -> (s, a)) -> StateT s m a
+stateT f = UpdateT $ \s -> do
+ let (s', a) = f s
+ return ([s'], a)
+
+get :: State s s
+get = state $ (,) <$> id <*> id
+
+getT :: Monad m => StateT s m s
+getT = stateT $ (,) <$> id <*> id
+
+put :: s -> State s ()
+put s = state $ const (s, ())
+
+putT :: Monad m => s -> StateT s m ()
+putT s = stateT $ const (s, ())
+
+modify :: (s -> s) -> State s ()
+modify f = state $ \s -> (f s, ())
+
+modifyT :: Monad m => (s -> s) -> StateT s m ()
+modifyT f = stateT $ \s -> (f s, ())

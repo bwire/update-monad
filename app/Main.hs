@@ -9,6 +9,7 @@ import Data.Monoid
 import Types
 import Writer
 import Reader
+import State
 import Data.Tuple (swap)
 
 processTransaction :: AccountAction -> BankBalance -> BankBalance
@@ -83,6 +84,25 @@ useATMWithReader init =
 getBalanceWithReader :: Reader AccountAction BankBalance -> BankBalance
 getBalanceWithReader = flip evalUpdate undefined
 
+-- With state 
+-- Actually I like it better than the initial Update version with useATM.
+-- Using MonadUpdate typeclass force us not to use 'a' parameter of the Update!!!
+-- But why not use it? In the initial scheme it always ().
+-- And in this case I don't need apply action at all - since it's equal to (flip const) everywhere - thus return the state unchanged! :))
+stateOp :: AccountAction -> (BankBalance -> State AccountAction BankBalance)
+stateOp s = \b -> Update $ \_ -> ([s], processTransaction s b)
+ 
+useATMWithState :: Update [AccountAction] AccountAction BankBalance
+useATMWithState = do
+  return (BankBalance 0)
+    >>= stateOp (Deposit 30)
+    >>= stateOp (Deposit 20)
+    >>= stateOp ApplyInterest
+    >>= stateOp (Withdraw 10)
+ 
+getResultWithState :: State AccountAction BankBalance -> ([AccountAction], BankBalance)
+getResultWithState = flip runUpdate undefined
+
 main :: IO ()
 main = do
   putStrLn . show $ resultWithLogUpdate useATM (BankBalance 0)
@@ -114,3 +134,6 @@ main = do
     . getBalanceWithReader 
     . useATMWithReader 
     $ BankBalance 0
+
+  -- state
+  putStrLn . show $ getResultWithState useATMWithState
